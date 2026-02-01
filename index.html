@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מדד הגאולה | עפ"י סימני הגמרא</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;700&family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --card-bg: #1c1c1e;
+            --gold: #D4AF37;
+            --gold-glow: rgba(212, 175, 55, 0.3);
+            --text-main: #f5f5f7;
+            --text-muted: #86868b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Rubik', sans-serif;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-family: 'Heebo', sans-serif;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: var(--gold);
+            text-shadow: 0 0 10px var(--gold-glow);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .gauge-container {
+            position: relative;
+            width: 260px;
+            height: 260px;
+            margin-bottom: 20px;
+        }
+
+        .gauge-ring {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(var(--gold) 0% 0%, #333 0% 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 40px var(--gold-glow);
+            transition: background 1.5s ease-out;
+        }
+
+        .gauge-inner {
+            width: 90%;
+            height: 90%;
+            background-color: var(--bg-color);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .score-number { font-size: 4.5rem; font-weight: 700; }
+        .score-label { font-size: 1rem; color: var(--text-muted); margin-top: -10px; }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, var(--gold), #B8860B);
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px var(--gold-glow);
+            transition: all 0.3s;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--gold-glow);
+        }
+
+        .refresh-btn:active { transform: translateY(0); }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            border-color: var(--gold);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(212, 175, 55, 0.2);
+        }
+
+        .card-header {
+            font-size: 1.1rem;
+            color: var(--gold);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .card-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+
+        .card-status {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .quote {
+            font-size: 0.85rem;
+            font-style: italic;
+            opacity: 0.7;
+            margin-top: 15px;
+            border-top: 1px solid #333;
+            padding-top: 12px;
+            color: var(--gold);
+        }
+
+        .click-hint {
+            font-size: 0.75rem;
+            color: #555;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 5% auto;
+            padding: 30px;
+            border: 2px solid var(--gold);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 50px var(--gold-glow);
+        }
+
+        .close {
+            color: var(--text-muted);
+            float: left;
+            font-size: 35px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close:hover { color: var(--gold); }
+
+        .modal-title {
+            color: var(--gold);
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .detail-item {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-right: 3px solid var(--gold);
+        }
+
+        .detail-label {
+            color: var(--gold);
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            color: var(--text-main);
+            font-size: 1.1rem;
+        }
+
+        .loader {
+            border: 4px solid #333;
+            border-top: 4px solid var(--gold);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #last-updated {
+            margin: 20px 0;
+            font-size: 0.85rem;
+            color: #666;
+            text-align: center;
+        }
+
+        .emunah-footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 25px;
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.05));
+            border-radius: 15px;
+            max-width: 900px;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+        }
+
+        .emunah-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: var(--gold);
+            font-weight: 500;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .metrics-grid { grid-template-columns: 1fr; }
+            h1 { font-size: 1.8rem; }
+            .score-number { font-size: 3.5rem; }
+            .modal-content { width: 95%; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>מדד הגאולה</h1>
+        <div class="subtitle">על פי סימני הגמרא • סנהדרין צז-צח • עדכון כל 10 דקות</div>
+    </div>
+
+    <div id="loader-view">
+        <div class="loader"></div>
+        <p style="text-align:center; color:#888; margin-top:10px;">טוען נתוני אמת...</p>
+    </div>
+
+    <div id="app-view" style="display: none; width: 100%; flex-direction: column; align-items: center;">
+        
+        <div class="gauge-container">
+            <div class="gauge-ring" id="gauge-ring">
+                <div class="gauge-inner">
+                    <div class="score-number" id="main-score">0%</div>
+                    <div class="score-label">מדד הגאולה</div>
+                </div>
+            </div>
+        </div>
+
+        <button class="refresh-btn" onclick="fetchData()">🔄 חשב את הקץ</button>
+
+        <div class="metrics-grid">
+            <div class="card" onclick="showDetails('poverty')">
+                <div class="card-header">עוני ומצוקה כלכלית</div>
+                <div class="card-value" id="poverty-val">--</div>
+                <div class="card-status" id="poverty-status">--</div>
+                <div class="quote">"עד שתכלה פרוטה מן הכיס"<br>(סנהדרין צז ע"א)</div>
+                <div class="click-hint">▲ לחץ לפרטים מלאים ▲</div>
+            </div>
+
+            <div class="card" onclick="showDetails('chutzpah')">
+                <div class="card-header">חוצפה ואלימות</div>
+                <div class="card-value" id="chutzpah-val">--</div>
+                <div class="card-status" id="chutzpah-status">--</div>
+                <div class="quote">"חוצפה יסגא"<br>(סנהדרין צז ע"א)</div>
+                <div class="click-hint">▲ לחץ לפרטים מלאים ▲</div>
+            </div>
+
+            <div class="card" onclick="showDetails('wisdomDecay')">
+                <div class="card-header">חכמת חכמים תסרח</div>
+                <div class="card-value" id="wisdom-val">--</div>
+                <div class="card-status" id="wisdom-status">--</div>
+                <div class="quote">"חכמת חכמים תסרח"<br>(סנהדרין צז ע"א)</div>
+                <div class="click-hint">▲ לחץ לפרטים מלאים ▲</div>
+            </div>
+
+            <div class="card" onclick="showDetails('distraction')">
+                <div class="card-header">היסח הדעת</div>
+                <div class="card-value" id="distraction-val">--</div>
+                <div class="card-status" id="distraction-status">--</div>
+                <div class="quote">"אין בן דוד בא אלא בהיסח הדעת"<br>(סנהדרין צז ע"א)</div>
+                <div class="click-hint">▲ לחץ לפרטים מלאים ▲</div>
+            </div>
+        </div>
+
+        <div id="last-updated">ממתין לעדכון...</div>
+
+        <div class="emunah-footer">
+            <div class="emunah-text">
+                אני מאמין באמונה שלמה בביאת המשיח,<br>
+                ואע"פ שיתמהמה עם כל זה אחכה לו בכל יום שיבוא!
+            </div>
+        </div>
+    </div>
+
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 class="modal-title" id="modalTitle">פרטים</h2>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        async function fetchData() {
+            try {
+                const uniqueUrl = `/api/check?cb=${new Date().getTime()}`;
+                
+                const response = await fetch(uniqueUrl, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                    cache: 'no-store'
+                });
+                
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const data = await response.json();
+                currentData = data;
+
+                if (data.status && data.status.includes("שבת") || data.status && data.status.includes("חג")) {
+                    document.getElementById('main-score').innerText = data.status.includes("שבת") ? "שבת" : "חג";
+                    document.getElementById('gauge-ring').style.background = `conic-gradient(#333 0% 100%)`;
+                    document.getElementById('last-updated').innerText = data.status;
+                    document.getElementById('loader-view').style.display = 'none';
+                    document.getElementById('app-view').style.display = 'flex';
+                    return;
+                }
+
+                updateGauge(data.totalScore || 0);
+
+                if (data.metrics) {
+                    updateCard('poverty', data.metrics.poverty);
+                    updateCard('chutzpah', data.metrics.chutzpah);
+                    updateCard('wisdom', data.metrics.wisdomDecay);
+                    updateCard('distraction', data.metrics.distraction);
+                }
+
+                document.getElementById('last-updated').innerText = 
+                    `עודכן: ${data.timestamp || new Date().toLocaleString('he-IL')} | עדכון הבא: ${data.nextUpdate || 'בקרוב'}`;
+                document.getElementById('last-updated').style.color = "#666";
+
+                document.getElementById('loader-view').style.display = 'none';
+                document.getElementById('app-view').style.display = 'flex';
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('last-updated').innerText = `שגיאה: ${error.message}`;
+                document.getElementById('last-updated').style.color = "#ff6b6b";
+                document.getElementById('loader-view').style.display = 'none';
+                document.getElementById('app-view').style.display = 'flex';
+            }
+        }
+
+        function updateCard(prefix, metric) {
+            if (!metric) return;
+            document.getElementById(`${prefix}-val`).innerText = 
+                metric.details && Object.keys(metric.details).length > 0 ? 
+                `ציון: ${metric.score}/25` : metric.score || '--';
+            document.getElementById(`${prefix}-status`).innerText = metric.summary || '--';
+        }
+
+        function updateGauge(percent) {
+            const ring = document.getElementById('gauge-ring');
+            const text = document.getElementById('main-score');
+            let current = 0;
+            const interval = setInterval(() => {
+                if (current >= percent) {
+                    clearInterval(interval);
+                } else {
+                    current++;
+                    text.innerText = current + '%';
+                    ring.style.background = `conic-gradient(var(--gold) ${current}%, #333 ${current}% 100%)`;
+                }
+            }, 15);
+        }
+
+        function showDetails(metricKey) {
+            if (!currentData || !currentData.metrics) return;
+            
+            const metric = currentData.metrics[metricKey];
+            if (!metric) return;
+
+            const titles = {
+                poverty: "עוני ומצוקה כלכלית - פרטים מלאים",
+                chutzpah: "חוצפה ואלימות - פרטים מלאים",
+                wisdomDecay: "חכמת חכמים תסרח - פרטים מלאים",
+                distraction: "היסח הדעת - פרטים מלאים"
+            };
+
+            document.getElementById('modalTitle').innerText = titles[metricKey] || "פרטים";
+            
+            let html = `<div class="detail-item">
+                <div class="detail-label">ציון:</div>
+                <div class="detail-value">${metric.score}/25 נקודות</div>
+            </div>`;
+            
+            html += `<div class="detail-item">
+                <div class="detail-label">מצב:</div>
+                <div class="detail-value">${metric.summary}</div>
+            </div>`;
+
+            if (metric.details && Object.keys(metric.details).length > 0) {
+                for (const [key, value] of Object.entries(metric.details)) {
+                    const label = formatLabel(key);
+                    const displayValue = Array.isArray(value) ? value.join(', ') : value;
+                    html += `<div class="detail-item">
+                        <div class="detail-label">${label}:</div>
+                        <div class="detail-value">${displayValue}</div>
+                    </div>`;
+                }
+            }
+
+            html += `<div class="detail-item" style="background: rgba(212, 175, 55, 0.1); border-right: 3px solid var(--gold);">
+                <div class="detail-label">מקור בגמרא:</div>
+                <div class="detail-value" style="font-style: italic;">${metric.quote}</div>
+            </div>`;
+
+            document.getElementById('modalBody').innerHTML = html;
+            document.getElementById('detailsModal').style.display = 'block';
+        }
+
+        function formatLabel(key) {
+            const labels = {
+                sp500Change: "שינוי S&P 500",
+                sp500Price: "מחיר S&P 500",
+                usdIlsCurrent: "דולר/שקל נוכחי",
+                usdIlsMonthlyAvg: "דולר/שקל ממוצע חודשי",
+                usdIlsVsAvg: "שינוי מול ממוצע חודשי",
+                inflationEstimate: "אומדן אינפלציה",
+                debtArticlesCount: "כתבות על חובות",
+                debtAverage: "ממוצע כתבות חובות",
+                indicators: "אינדיקטורים",
+                currentReports: "דיווחים נוכחיים",
+                averageReports: "ממוצע דיווחים",
+                percentVsAverage: "אחוז מול ממוצע",
+                interpretation: "פרשנות",
+                negativeArticlesCount: "כתבות שליליות",
+                weeklyAverage: "ממוצע שבועי",
+                wikiViews: "צפיות ויקיפדיה (אתמול)",
+                newsMentions: "אזכורים בחדשות",
+                total: "סה\"כ",
+                dailyAverage: "ממוצע יומי"
+            };
+            return labels[key] || key;
+        }
+
+        function closeModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailsModal');
+            if (event.target == modal) closeModal();
+        }
+
+        fetchData();
+        setInterval(fetchData, 10 * 60 * 1000);
+    </script>
+</body>
+</html>

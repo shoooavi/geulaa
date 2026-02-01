@@ -1,0 +1,9 @@
+{
+  "name": "geula-meter",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node api/check.js",
+    "dev": "vercel dev"
+  }
+}
