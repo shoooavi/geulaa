@@ -1,27 +1,380 @@
-// מדד גאולה מקצועי - נתונים אמיתיים עם cache busting
+// ============================================
+// מדד הגאולה - API מקצועי ועובד
+// ============================================
 
-async function safeExecute(fn, fallbackValue) {
+// פונקציות עזר
+function calculateAverage(arr) {
+    if (!arr || arr.length === 0) return 0;
+    const filtered = arr.filter(x => x !== null && x !== undefined && !isNaN(x));
+    if (filtered.length === 0) return 0;
+    return filtered.reduce((a, b) => a + b, 0) / filtered.length;
+}
+
+async function fetchWithTimeout(url, timeout = 5000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
     try {
-        return await fn();
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(id);
+        return response;
     } catch (error) {
-        console.error("Error:", error.message);
-        return fallbackValue;
+        clearTimeout(id);
+        throw error;
     }
 }
 
-function calculateAverage(arr) {
-    if (!arr || arr.length === 0) return 0;
-    return arr.reduce((a, b) => a + b, 0) / arr.length;
+// ============================================
+// מדד 1: כלכלה - "עד שתכלה פרוטה מן הכיס"
+// ============================================
+async function getEconomyMetric() {
+    try {
+        const results = {
+            sp500: null,
+            usdils: null,
+            bitcoin: null,
+            gold: null,
+            ta35: null
+        };
+
+        // S&P 500
+        try {
+            const sp500Res = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=1mo');
+            const sp500Data = await sp500Res.json();
+            const sp500Chart = sp500Data.chart.result[0];
+            const currentPrice = sp500Chart.meta.regularMarketPrice;
+            const closes = sp500Chart.indicators.quote[0].close.filter(x => x !== null);
+            const monthAvg = calculateAverage(closes);
+            results.sp500 = {
+                current: currentPrice,
+                monthAvg: monthAvg,
+                changePercent: ((currentPrice - monthAvg) / monthAvg) * 100
+            };
+        } catch (e) {
+            console.error('S&P 500 error:', e.message);
+        }
+
+        // דולר-שקל
+        try {
+            const ilsRes = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/ILS%3DX?interval=1d&range=1mo');
+            const ilsData = await ilsRes.json();
+            const ilsChart = ilsData.chart.result[0];
+            const currentPrice = ilsChart.meta.regularMarketPrice;
+            const closes = ilsChart.indicators.quote[0].close.filter(x => x !== null);
+            const monthAvg = calculateAverage(closes);
+            results.usdils = {
+                current: currentPrice,
+                monthAvg: monthAvg,
+                changePercent: ((currentPrice - monthAvg) / monthAvg) * 100
+            };
+        } catch (e) {
+            console.error('USD/ILS error:', e.message);
+        }
+
+        // ביטקוין
+        try {
+            const btcRes = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?interval=1d&range=1mo');
+            const btcData = await btcRes.json();
+            const btcChart = btcData.chart.result[0];
+            const currentPrice = btcChart.meta.regularMarketPrice;
+            const closes = btcChart.indicators.quote[0].close.filter(x => x !== null);
+            const monthAvg = calculateAverage(closes);
+            results.bitcoin = {
+                current: currentPrice,
+                monthAvg: monthAvg,
+                changePercent: ((currentPrice - monthAvg) / monthAvg) * 100
+            };
+        } catch (e) {
+            console.error('Bitcoin error:', e.message);
+        }
+
+        // זהב
+        try {
+            const goldRes = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=1mo');
+            const goldData = await goldRes.json();
+            const goldChart = goldData.chart.result[0];
+            const currentPrice = goldChart.meta.regularMarketPrice;
+            const closes = goldChart.indicators.quote[0].close.filter(x => x !== null);
+            const monthAvg = calculateAverage(closes);
+            results.gold = {
+                current: currentPrice,
+                monthAvg: monthAvg,
+                changePercent: ((currentPrice - monthAvg) / monthAvg) * 100
+            };
+        } catch (e) {
+            console.error('Gold error:', e.message);
+        }
+
+        // TA-35
+        try {
+            const ta35Res = await fetchWithTimeout('https://query1.finance.yahoo.com/v8/finance/chart/%5ETA35.TA?interval=1d&range=1mo');
+            const ta35Data = await ta35Res.json();
+            const ta35Chart = ta35Data.chart.result[0];
+            const currentPrice = ta35Chart.meta.regularMarketPrice;
+            const closes = ta35Chart.indicators.quote[0].close.filter(x => x !== null);
+            const monthAvg = calculateAverage(closes);
+            results.ta35 = {
+                current: currentPrice,
+                monthAvg: monthAvg,
+                changePercent: ((currentPrice - monthAvg) / monthAvg) * 100
+            };
+        } catch (e) {
+            console.error('TA-35 error:', e.message);
+        }
+
+        // חישוב ציון
+        let score = 0;
+        const indicators = [];
+
+        if (results.sp500 && results.sp500.changePercent < -4) {
+            score += 6;
+            indicators.push(`S&P ${results.sp500.changePercent.toFixed(1)}%`);
+        } else if (results.sp500 && results.sp500.changePercent < -2) {
+            score += 3;
+            indicators.push(`S&P ${results.sp500.changePercent.toFixed(1)}%`);
+        }
+
+        if (results.usdils && results.usdils.changePercent > 3) {
+            score += 5;
+            indicators.push(`$ חזק ${results.usdils.changePercent.toFixed(1)}%`);
+        } else if (results.usdils && results.usdils.changePercent > 1.5) {
+            score += 2;
+            indicators.push(`$ עולה ${results.usdils.changePercent.toFixed(1)}%`);
+        }
+
+        if (results.bitcoin && results.bitcoin.changePercent > 10) {
+            score += 4;
+            indicators.push(`BTC ${results.bitcoin.changePercent.toFixed(1)}%`);
+        }
+
+        if (results.gold && results.gold.changePercent > 4) {
+            score += 3;
+            indicators.push(`זהב ${results.gold.changePercent.toFixed(1)}%`);
+        }
+
+        if (results.ta35 && results.ta35.changePercent < -3) {
+            score += 5;
+            indicators.push(`TA-35 ${results.ta35.changePercent.toFixed(1)}%`);
+        }
+
+        return {
+            score: Math.min(score, 25),
+            summary: indicators.length > 0 ? indicators.join(' | ') : 'יציבות כלכלית',
+            details: results,
+            quote: 'עד שתכלה פרוטה מן הכיס'
+        };
+
+    } catch (error) {
+        console.error('Economy metric error:', error);
+        return {
+            score: 0,
+            summary: 'שגיאה בטעינת נתונים',
+            details: {},
+            quote: 'עד שתכלה פרוטה מן הכיס'
+        };
+    }
 }
 
+// ============================================
+// מדד 2: חוצפה - "חוצפה יסגא"
+// ============================================
+async function getChutzpahMetric() {
+    try {
+        const url = 'https://news.google.com/rss/search?q=אלימות+OR+שוד+OR+פשע+OR+תקיפה&hl=he&gl=IL&ceid=IL:he';
+        const response = await fetchWithTimeout(url);
+        const text = await response.text();
+
+        const keywords = ['אלימות', 'תקיפה', 'שוד', 'גניבה', 'רצח', 'פשע', 'נעצר'];
+        let count = 0;
+
+        keywords.forEach(keyword => {
+            const regex = new RegExp(keyword, 'gi');
+            const matches = text.match(regex);
+            if (matches) count += matches.length;
+        });
+
+        // ממוצע: 20 דיווחים
+        const average = 20;
+        const percent = (count / average) * 100;
+
+        let score = 0;
+        let status = '';
+
+        if (percent > 150) {
+            score = 20;
+            status = 'רמה חריגה';
+        } else if (percent > 120) {
+            score = 12;
+            status = 'רמה גבוהה';
+        } else if (percent > 100) {
+            score = 6;
+            status = 'מעל ממוצע';
+        } else {
+            status = 'רמה רגילה';
+        }
+
+        return {
+            score: Math.min(score, 25),
+            summary: status,
+            details: {
+                count: count,
+                average: average,
+                percent: percent.toFixed(1) + '%'
+            },
+            quote: 'חוצפה יסגא'
+        };
+
+    } catch (error) {
+        console.error('Chutzpah metric error:', error);
+        return {
+            score: 0,
+            summary: 'שגיאה',
+            details: {},
+            quote: 'חוצפה יסגא'
+        };
+    }
+}
+
+// ============================================
+// מדד 3: חכמת חכמים תסרח
+// ============================================
+async function getWisdomDecayMetric() {
+    try {
+        const url = 'https://news.google.com/rss/search?q=חרדים+ביקורת+OR+חרדים+מחאה+OR+חרדים+קיטוב&hl=he&gl=IL&ceid=IL:he';
+        const response = await fetchWithTimeout(url);
+        const text = await response.text();
+
+        const keywords = ['ביקורת', 'מחאה', 'סכסוך', 'קיטוב', 'עימות', 'משבר'];
+        let count = 0;
+
+        keywords.forEach(keyword => {
+            const regex = new RegExp('חרדים.*?' + keyword + '|' + keyword + '.*?חרדים', 'gi');
+            const matches = text.match(regex);
+            if (matches) count += matches.length;
+        });
+
+        // כל כתבה = 1 נקודה, עד 25
+        const score = Math.min(count, 25);
+
+        let status = '';
+        if (score >= 18) status = 'ביקורת חריפה מאוד';
+        else if (score >= 12) status = 'ביקורת חריפה';
+        else if (score >= 7) status = 'ביקורת משמעותית';
+        else if (score >= 3) status = 'ביקורת קלה';
+        else status = 'שקט יחסי';
+
+        return {
+            score: score,
+            summary: status,
+            details: {
+                articles: count,
+                formula: 'כל כתבה = 1 נקודה'
+            },
+            quote: 'חכמת חכמים תסרח'
+        };
+
+    } catch (error) {
+        console.error('Wisdom decay metric error:', error);
+        return {
+            score: 0,
+            summary: 'שגיאה',
+            details: {},
+            quote: 'חכמת חכמים תסרח'
+        };
+    }
+}
+
+// ============================================
+// מדד 4: היסח הדעת
+// ============================================
+async function getDistractionMetric() {
+    try {
+        // Wikipedia
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const dateStr = yesterday.toISOString().slice(0, 10).replace(/-/g, '');
+
+        let wikiViews = 80; // ברירת מחדל
+        try {
+            const wikiUrl = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/he.wikipedia/all-access/all-agents/משיח/daily/${dateStr}/${dateStr}`;
+            const wikiRes = await fetchWithTimeout(wikiUrl);
+            const wikiData = await wikiRes.json();
+            if (wikiData.items && wikiData.items[0]) {
+                wikiViews = wikiData.items[0].views;
+            }
+        } catch (e) {
+            console.error('Wiki error:', e.message);
+        }
+
+        // חדשות
+        let newsMentions = 10; // ברירת מחדל
+        try {
+            const newsUrl = 'https://news.google.com/rss/search?q=משיח+OR+גאולה&hl=he&gl=IL&ceid=IL:he';
+            const newsRes = await fetchWithTimeout(newsUrl);
+            const newsText = await newsRes.text();
+            const matches = newsText.match(/משיח/gi);
+            newsMentions = matches ? matches.length : 0;
+        } catch (e) {
+            console.error('News error:', e.message);
+        }
+
+        const total = wikiViews + newsMentions;
+        const average = 90;
+        const percent = (total / average) * 100;
+
+        let score = 0;
+        let status = '';
+
+        // ככל שפחות עניין = יותר היסח דעת = ציון גבוה
+        if (percent < 40) {
+            score = 20;
+            status = 'היסח דעת מוחלט';
+        } else if (percent < 60) {
+            score = 14;
+            status = 'היסח דעת חמור';
+        } else if (percent < 80) {
+            score = 8;
+            status = 'עניין נמוך';
+        } else if (percent < 100) {
+            score = 4;
+            status = 'כמעט ממוצע';
+        } else {
+            status = 'עניין רגיל';
+        }
+
+        return {
+            score: Math.min(score, 25),
+            summary: status,
+            details: {
+                wiki: wikiViews,
+                news: newsMentions,
+                total: total,
+                average: average,
+                percent: percent.toFixed(1) + '%'
+            },
+            quote: 'אין בן דוד בא אלא בהיסח הדעת'
+        };
+
+    } catch (error) {
+        console.error('Distraction metric error:', error);
+        return {
+            score: 0,
+            summary: 'שגיאה',
+            details: {},
+            quote: 'אין בן דוד בא אלא בהיסח הדעת'
+        };
+    }
+}
+
+// ============================================
+// Main Handler
+// ============================================
 export default async function handler(req, res) {
+    // CORS Headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
 
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
@@ -29,259 +382,63 @@ export default async function handler(req, res) {
 
     try {
         const now = new Date();
-        const timestamp = now.getTime();
 
         // בדיקת שבת
         const dayOfWeek = now.getDay();
-        const currentHour = now.getHours();
-        
-        if (dayOfWeek === 6 || (dayOfWeek === 5 && currentHour >= 15)) {
+        const hour = now.getHours();
+
+        if (dayOfWeek === 6 || (dayOfWeek === 5 && hour >= 15)) {
             return res.status(200).json({
                 totalScore: 0,
-                status: dayOfWeek === 6 ? "שבת שלום" : "ערב שבת",
-                timestamp: now.toLocaleString('he-IL'),
+                status: 'שבת שלום',
+                timestamp: now.toISOString(),
                 metrics: {
-                    poverty: { score: 0, details: {}, summary: "שבת שלום" },
-                    chutzpah: { score: 0, details: {}, summary: "שבת שלום" },
-                    wisdomDecay: { score: 0, details: {}, summary: "שבת שלום" },
-                    distraction: { score: 0, details: {}, summary: "שבת שלום" }
+                    poverty: { score: 0, summary: 'שבת שלום', details: {} },
+                    chutzpah: { score: 0, summary: 'שבת שלום', details: {} },
+                    wisdomDecay: { score: 0, summary: 'שבת שלום', details: {} },
+                    distraction: { score: 0, summary: 'שבת שלום', details: {} }
                 }
             });
         }
 
-        // 1. מדד כלכלה מקצועי
-        const povertyData = await safeExecute(async () => {
-            // S&P 500
-            const sp500Res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=1mo&_=${timestamp}`);
-            const sp500Data = await sp500Res.json();
-            const sp500Result = sp500Data.chart.result[0];
-            const sp500Price = sp500Result.meta.regularMarketPrice;
-            const sp500Prev = sp500Result.meta.previousClose;
-            const sp500Change = ((sp500Price - sp500Prev) / sp500Prev) * 100;
-            const sp500Closes = sp500Result.indicators.quote[0].close.filter(p => p !== null);
-            const sp500MonthAvg = calculateAverage(sp500Closes);
-            const sp500VsMonthAvg = ((sp500Price - sp500MonthAvg) / sp500MonthAvg) * 100;
-            
-            // דולר-שקל
-            const ilsRes = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/ILS%3DX?interval=1d&range=1mo&_=${timestamp}`);
-            const ilsData = await ilsRes.json();
-            const ilsResult = ilsData.chart.result[0];
-            const ilsPrice = ilsResult.meta.regularMarketPrice;
-            const ilsCloses = ilsResult.indicators.quote[0].close.filter(p => p !== null);
-            const ilsMonthAvg = calculateAverage(ilsCloses);
-            const ilsVsAvg = ((ilsPrice - ilsMonthAvg) / ilsMonthAvg) * 100;
-            
-            // ביטקוין
-            const btcRes = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?interval=1d&range=1mo&_=${timestamp}`);
-            const btcData = await btcRes.json();
-            const btcResult = btcData.chart.result[0];
-            const btcPrice = btcResult.meta.regularMarketPrice;
-            const btcCloses = btcResult.indicators.quote[0].close.filter(p => p !== null);
-            const btcMonthAvg = calculateAverage(btcCloses);
-            const btcVsAvg = ((btcPrice - btcMonthAvg) / btcMonthAvg) * 100;
-            
-            // זהב
-            const goldRes = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=1mo&_=${timestamp}`);
-            const goldData = await goldRes.json();
-            const goldResult = goldData.chart.result[0];
-            const goldPrice = goldResult.meta.regularMarketPrice;
-            const goldCloses = goldResult.indicators.quote[0].close.filter(p => p !== null);
-            const goldMonthAvg = calculateAverage(goldCloses);
-            const goldVsAvg = ((goldPrice - goldMonthAvg) / goldMonthAvg) * 100;
-            
-            // כסף
-            const silverRes = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/SI%3DF?interval=1d&range=1mo&_=${timestamp}`);
-            const silverData = await silverRes.json();
-            const silverResult = silverData.chart.result[0];
-            const silverPrice = silverResult.meta.regularMarketPrice;
-            const silverCloses = silverResult.indicators.quote[0].close.filter(p => p !== null);
-            const silverMonthAvg = calculateAverage(silverCloses);
-            const silverVsAvg = ((silverPrice - silverMonthAvg) / silverMonthAvg) * 100;
-            
-            // TA-35
-            const ta35Res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5ETA35.TA?interval=1d&range=1mo&_=${timestamp}`);
-            const ta35Data = await ta35Res.json();
-            const ta35Result = ta35Data.chart.result[0];
-            const ta35Price = ta35Result.meta.regularMarketPrice;
-            const ta35Closes = ta35Result.indicators.quote[0].close.filter(p => p !== null);
-            const ta35MonthAvg = calculateAverage(ta35Closes);
-            const ta35VsAvg = ((ta35Price - ta35MonthAvg) / ta35MonthAvg) * 100;
-            
-            // חובות
-            const debtNewsRes = await fetch(`https://news.google.com/rss/search?q=חובות+OR+מצוקה+כלכלית+OR+פשיטת+רגל&hl=he&gl=IL&ceid=IL:he&_=${timestamp}`);
-            const debtNewsText = await debtNewsRes.text();
-            const debtKeywords = ['חובות', 'חוב', 'מצוקה', 'פשיטת רגל', 'משכנתא', 'הלוואה'];
-            let debtCount = 0;
-            debtKeywords.forEach(keyword => {
-                const matches = debtNewsText.match(new RegExp(keyword, 'gi'));
-                if (matches) debtCount += matches.length;
-            });
-            
-            // חישוב ציון
-            let score = 0;
-            const indicators = [];
-            
-            if (sp500VsMonthAvg < -5) { score += 8; indicators.push("S&P ↓5%+ מממוצע"); }
-            else if (sp500VsMonthAvg < -3) { score += 5; indicators.push("S&P ↓3%+"); }
-            else if (sp500VsMonthAvg < -1.5) { score += 2; indicators.push("S&P ↓קל"); }
-            
-            if (ilsVsAvg > 4) { score += 7; indicators.push("$ חזק 4%+"); }
-            else if (ilsVsAvg > 2.5) { score += 4; indicators.push("$ חזק 2.5%+"); }
-            else if (ilsVsAvg > 1.5) { score += 2; indicators.push("$ מתחזק"); }
-            
-            if (btcVsAvg > 15) { score += 5; indicators.push("BTC ↑15%+ (בריחה)"); }
-            else if (btcVsAvg < -15) { score += 3; indicators.push("BTC ↓15%+"); }
-            
-            if (goldVsAvg > 5) { score += 4; indicators.push("זהב ↑5%+"); }
-            else if (goldVsAvg > 3) { score += 2; indicators.push("זהב עולה"); }
-            
-            if (ta35VsAvg < -4) { score += 6; indicators.push("TA-35 ↓4%+"); }
-            else if (ta35VsAvg < -2) { score += 3; indicators.push("TA-35 ↓"); }
-            
-            if (debtCount > 30) { score += 5; indicators.push("חובות חריג"); }
-            else if (debtCount > 20) { score += 2; indicators.push("חובות מוגבר"); }
-            
-            return {
-                score: Math.min(score, 25),
-                summary: indicators.length > 0 ? indicators.join(" | ") : "יציבות",
-                details: {
-                    sp500: { price: sp500Price.toFixed(2), vsMonth: sp500VsMonthAvg.toFixed(2) + "%", daily: sp500Change.toFixed(2) + "%" },
-                    usdIls: { price: ilsPrice.toFixed(3), vsMonth: ilsVsAvg.toFixed(2) + "%" },
-                    bitcoin: { price: btcPrice.toFixed(0), vsMonth: btcVsAvg.toFixed(2) + "%" },
-                    gold: { price: goldPrice.toFixed(2), vsMonth: goldVsAvg.toFixed(2) + "%" },
-                    silver: { price: silverPrice.toFixed(2), vsMonth: silverVsAvg.toFixed(2) + "%" },
-                    ta35: { price: ta35Price.toFixed(2), vsMonth: ta35VsAvg.toFixed(2) + "%" },
-                    debtArticles: debtCount,
-                    indicators
-                },
-                quote: "עד שתכלה פרוטה מן הכיס (סנהדרין צז)"
-            };
-        }, { score: 0, summary: "שגיאה", details: {}, quote: "עד שתכלה פרוטה מן הכיס" });
+        // שליפת כל המדדים במקביל
+        console.log('Fetching all metrics...');
+        const [poverty, chutzpah, wisdomDecay, distraction] = await Promise.all([
+            getEconomyMetric(),
+            getChutzpahMetric(),
+            getWisdomDecayMetric(),
+            getDistractionMetric()
+        ]);
 
-        // 2. חוצפה
-        const chutzpahData = await safeExecute(async () => {
-            const violenceRes = await fetch(`https://news.google.com/rss/search?q=אלימות+OR+שוד+OR+פשע+OR+תקיפה+OR+גניבה&hl=he&gl=IL&ceid=IL:he&_=${timestamp}`);
-            const violenceText = await violenceRes.text();
-            
-            const keywords = ['אלימות', 'תקיפה', 'שוד', 'גניבה', 'פריצה', 'רצח', 'פצוע', 'נעצר', 'פשע', 'דקירה', 'ירי'];
-            let count = 0;
-            keywords.forEach(keyword => {
-                const matches = violenceText.match(new RegExp(keyword, 'gi'));
-                if (matches) count += matches.length;
-            });
-            
-            const avg = 20;
-            const pct = (count / avg) * 100;
-            
-            let score = 0, status = "";
-            if (pct > 180) { score = 25; status = "חריג מאוד"; }
-            else if (pct > 140) { score = 18; status = "חריג"; }
-            else if (pct > 115) { score = 12; status = "מוגבר"; }
-            else if (pct > 100) { score = 6; status = "מעל ממוצע"; }
-            else if (pct > 85) { score = 3; status = "כמעט ממוצע"; }
-            else { status = "מתחת ממוצע"; }
-            
-            return {
-                score,
-                summary: status,
-                details: { current: count, average: avg, percent: pct.toFixed(1) + "%" },
-                quote: "חוצפה יסגא (סנהדרין צז)"
-            };
-        }, { score: 0, summary: "שגיאה", details: {}, quote: "חוצפה יסגא" });
-
-        // 3. חכמת חכמים תסרח - כל כתבה = נקודה
-        const wisdomDecayData = await safeExecute(async () => {
-            const charediRes = await fetch(`https://news.google.com/rss/search?q=חרדים+ביקורת+OR+חרדים+מחאה+OR+חרדים+סכסוך&hl=he&gl=IL&ceid=IL:he&_=${timestamp}`);
-            const charediText = await charediRes.text();
-            
-            const keywords = ['ביקורת', 'מחאה', 'סכסוך', 'מתיחות', 'קיטוב', 'עימות', 'משבר', 'פגיעה', 'שנאה'];
-            let count = 0;
-            keywords.forEach(keyword => {
-                const regex = new RegExp('חרדים.*' + keyword + '|' + keyword + '.*חרדים', 'gi');
-                const matches = charediText.match(regex);
-                if (matches) count += matches.length;
-            });
-            
-            const score = Math.min(count, 25);
-            let status = "";
-            if (score >= 20) status = "ביקורת חריפה ביותר";
-            else if (score >= 15) status = "ביקורת חריפה";
-            else if (score >= 10) status = "ביקורת משמעותית";
-            else if (score >= 5) status = "ביקורת קלה";
-            else status = "אקלים חיובי";
-            
-            return {
-                score,
-                summary: status,
-                details: { articles: count, formula: "כל כתבה = 1 נקודה (מקס 25)" },
-                quote: "חכמת חכמים תסרח (סנהדרין צז)"
-            };
-        }, { score: 0, summary: "שגיאה", details: {}, quote: "חכמת חכמים תסרח" });
-
-        // 4. היסח הדעת
-        const distractionData = await safeExecute(async () => {
-            const yesterday = new Date(now);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const dateStr = yesterday.toISOString().slice(0, 10).replace(/-/g, '');
-            
-            const wikiRes = await fetch(`https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/he.wikipedia/all-access/all-agents/משיח/daily/${dateStr}/${dateStr}?_=${timestamp}`);
-            const wikiData = await wikiRes.json();
-            const wikiViews = wikiData.items?.[0]?.views || 80;
-            
-            const newsRes = await fetch(`https://news.google.com/rss/search?q=משיח+OR+גאולה&hl=he&gl=IL&ceid=IL:he&_=${timestamp}`);
-            const newsText = await newsRes.text();
-            const mentions = (newsText.match(/משיח/gi) || []).length;
-            
-            const total = wikiViews + mentions;
-            const avg = 90;
-            const pct = (total / avg) * 100;
-            
-            let score = 0, status = "";
-            if (pct < 30) { score = 25; status = "היסח דעת מוחלט"; }
-            else if (pct < 50) { score = 18; status = "היסח דעת חמור"; }
-            else if (pct < 70) { score = 12; status = "היסח דעת משמעותי"; }
-            else if (pct < 90) { score = 6; status = "עניין נמוך"; }
-            else if (pct < 110) { score = 3; status = "כמעט ממוצע"; }
-            else { status = "עניין מוגבר"; }
-            
-            return {
-                score,
-                summary: status,
-                details: { wiki: wikiViews, news: mentions, total, average: avg, percent: pct.toFixed(1) + "%" },
-                quote: "אין בן דוד בא אלא בהיסח הדעת (סנהדרין צז)"
-            };
-        }, { score: 0, summary: "שגיאה", details: {}, quote: "אין בן דוד בא אלא בהיסח הדעת" });
-
-        const totalScore = povertyData.score + chutzpahData.score + wisdomDecayData.score + distractionData.score;
+        const totalScore = poverty.score + chutzpah.score + wisdomDecay.score + distraction.score;
         const percentScore = Math.min((totalScore / 100) * 100, 99.9);
 
-        res.status(200).json({
+        console.log('Scores:', {
+            poverty: poverty.score,
+            chutzpah: chutzpah.score,
+            wisdomDecay: wisdomDecay.score,
+            distraction: distraction.score,
+            total: totalScore,
+            percent: percentScore
+        });
+
+        return res.status(200).json({
             totalScore: Math.round(percentScore),
-            timestamp: now.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false }),
-            nextUpdate: new Date(now.getTime() + 10 * 60 * 1000).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false }),
-            rawScore: totalScore,
-            maxScore: 100,
-            fetchId: timestamp,
+            timestamp: now.toISOString(),
+            nextUpdate: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
             metrics: {
-                poverty: povertyData,
-                chutzpah: chutzpahData,
-                wisdomDecay: wisdomDecayData,
-                distraction: distractionData
+                poverty: poverty,
+                chutzpah: chutzpah,
+                wisdomDecay: wisdomDecay,
+                distraction: distraction
             }
         });
 
     } catch (error) {
-        console.error('Error:', error);
-        res.status(200).json({
-            totalScore: 15,
-            timestamp: new Date().toLocaleString('he-IL'),
-            error: error.message,
-            metrics: {
-                poverty: { score: 4, summary: "שגיאה", details: {} },
-                chutzpah: { score: 4, summary: "שגיאה", details: {} },
-                wisdomDecay: { score: 4, summary: "שגיאה", details: {} },
-                distraction: { score: 3, summary: "שגיאה", details: {} }
-            }
+        console.error('Handler error:', error);
+        return res.status(500).json({
+            error: 'שגיאה בשרת',
+            message: error.message
         });
     }
 }
