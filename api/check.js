@@ -1,4 +1,4 @@
-// מדד גאולה מתוקן - 4 מדדים בלבד, חישוב ממוצע נכון, תמיכה בשבת וחגים
+// מדד גאולה מתוקן - 4 מדדים בלבד, חישוב ממוצע נכון, תמיכה בשבת בלבד
 
 async function safeExecute(fn, fallbackValue) {
     try {
@@ -31,51 +31,24 @@ export default async function handler(req, res) {
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const dd = String(now.getDate()).padStart(2, '0');
 
-        // בדיקת שבת וחגים דרך Hebcal API
+        // בדיקת שבת בלבד (לא חגים)
         const hebcalCheck = await safeExecute(async () => {
-            const hebcalRes = await fetch(
-                `https://www.hebcal.com/shabbat?cfg=json&geonameid=281184&M=on&gy=${yyyy}&gm=${mm}&gd=${dd}`
-            );
-            const hebcalData = await hebcalRes.json();
-            
             const dayOfWeek = now.getDay();
             const currentHour = now.getHours();
             
-            // בדיקה אם יש נרות שבת/חג היום או מחר
-            const candleLightingToday = hebcalData.items.find(item => 
-                item.category === 'candles' && 
-                new Date(item.date).toDateString() === now.toDateString()
-            );
-            
-            const havdalahToday = hebcalData.items.find(item => 
-                item.category === 'havdalah' && 
-                new Date(item.date).toDateString() === now.toDateString()
-            );
-            
-            const holidayToday = hebcalData.items.find(item => 
-                (item.category === 'holiday' || item.yomtov === true) && 
-                new Date(item.date).toDateString() === now.toDateString()
-            );
-            
-            // בדיקה: שבת או ערב שבת/חג
-            let isShabbatOrHoliday = false;
+            let isShabbat = false;
             let message = "";
             
+            // בדיקה פשוטה: רק שבת או ערב שבת
             if (dayOfWeek === 6) { // שבת
-                isShabbatOrHoliday = true;
+                isShabbat = true;
                 message = "שבת שלום";
-            } else if (dayOfWeek === 5 && currentHour >= 15) { // ערב שבת
-                isShabbatOrHoliday = true;
+            } else if (dayOfWeek === 5 && currentHour >= 15) { // ערב שבת מ-15:00
+                isShabbat = true;
                 message = "שבת שלום - ערב שבת";
-            } else if (holidayToday) { // חג
-                isShabbatOrHoliday = true;
-                message = `חג שמח - ${holidayToday.title}`;
-            } else if (candleLightingToday && currentHour >= 15) { // ערב חג
-                isShabbatOrHoliday = true;
-                message = `ערב חג - ${candleLightingToday.title}`;
             }
             
-            return { isShabbatOrHoliday, message };
+            return { isShabbatOrHoliday: isShabbat, message };
         }, { isShabbatOrHoliday: false, message: "" });
 
         if (hebcalCheck.isShabbatOrHoliday) {
